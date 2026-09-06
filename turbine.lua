@@ -5,7 +5,7 @@
 
 local functions = require("functions")
 
-local REFRESH_TIME = 1
+local REFRESH_TIME = 0.1
 
 --------------------------------------------------
 -- PROCURAR MONITOR
