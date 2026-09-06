@@ -6,14 +6,46 @@
 local functions = {}
 
 --------------------------------------------------
+-- CONVERTER VALORES DO MEKANISM
+--------------------------------------------------
+
+function functions.toNumber(value)
+
+    if type(value) == "number" then
+        return value
+    end
+
+    if type(value) == "table" then
+
+        -- Alguns valores podem vir como:
+        -- {amount = 1000, capacity = 2000}
+
+        if type(value.amount) == "number" then
+            return value.amount
+        end
+
+        if type(value.value) == "number" then
+            return value.value
+        end
+
+        -- Caso seja uma tabela numérica
+        if type(value[1]) == "number" then
+            return value[1]
+        end
+
+    end
+
+    return 0
+end
+
+
+--------------------------------------------------
 -- LOCALIZAR TURBINA
 --------------------------------------------------
 
 function functions.findTurbine()
 
-    local names = peripheral.getNames()
-
-    for _, name in ipairs(names) do
+    for _, name in ipairs(peripheral.getNames()) do
 
         local methods = peripheral.getMethods(name)
 
@@ -22,9 +54,7 @@ function functions.findTurbine()
             for _, method in ipairs(methods) do
 
                 if method == "getSteamFilledPercentage" then
-
                     return peripheral.wrap(name), name
-
                 end
 
             end
@@ -38,28 +68,28 @@ end
 
 
 --------------------------------------------------
--- VALOR SEGURO
+-- CHAMAR MÉTODO COM SEGURANÇA
 --------------------------------------------------
 
-function functions.safeCall(peripheralObject, method, default)
+function functions.safeCall(turbine, method, default)
 
-    if not peripheralObject then
+    if not turbine then
         return default
     end
 
-    if type(peripheralObject[method]) == "function" then
-
-        local ok, result = pcall(
-            peripheralObject[method]
-        )
-
-        if ok and result ~= nil then
-            return result
-        end
-
+    if type(turbine[method]) ~= "function" then
+        return default
     end
 
-    return default
+    local ok, result = pcall(function()
+        return turbine[method]()
+    end)
+
+    if not ok or result == nil then
+        return default
+    end
+
+    return result
 end
 
 
@@ -69,10 +99,12 @@ end
 
 function functions.getSteam(turbine)
 
-    return functions.safeCall(
-        turbine,
-        "getSteam",
-        0
+    return functions.toNumber(
+        functions.safeCall(
+            turbine,
+            "getSteam",
+            0
+        )
     )
 
 end
@@ -80,10 +112,12 @@ end
 
 function functions.getSteamCapacity(turbine)
 
-    return functions.safeCall(
-        turbine,
-        "getSteamCapacity",
-        0
+    return functions.toNumber(
+        functions.safeCall(
+            turbine,
+            "getSteamCapacity",
+            0
+        )
     )
 
 end
@@ -91,11 +125,13 @@ end
 
 function functions.getSteamPercentage(turbine)
 
-    return functions.safeCall(
+    local value = functions.safeCall(
         turbine,
         "getSteamFilledPercentage",
         0
     )
+
+    return functions.toNumber(value)
 
 end
 
@@ -106,25 +142,29 @@ end
 
 function functions.getSteamInput(turbine)
 
-    return functions.safeCall(
-        turbine,
-        "getLastSteamInputRate",
-        0
+    return functions.toNumber(
+        functions.safeCall(
+            turbine,
+            "getLastSteamInputRate",
+            0
+        )
     )
 
 end
 
 
 --------------------------------------------------
--- FLOW RATE
+-- FLOW
 --------------------------------------------------
 
 function functions.getFlow(turbine)
 
-    return functions.safeCall(
-        turbine,
-        "getFlowRate",
-        0
+    return functions.toNumber(
+        functions.safeCall(
+            turbine,
+            "getFlowRate",
+            0
+        )
     )
 
 end
@@ -132,10 +172,12 @@ end
 
 function functions.getMaxFlow(turbine)
 
-    return functions.safeCall(
-        turbine,
-        "getMaxFlowRate",
-        0
+    return functions.toNumber(
+        functions.safeCall(
+            turbine,
+            "getMaxFlowRate",
+            0
+        )
     )
 
 end
@@ -147,10 +189,12 @@ end
 
 function functions.getEnergy(turbine)
 
-    return functions.safeCall(
-        turbine,
-        "getEnergy",
-        0
+    return functions.toNumber(
+        functions.safeCall(
+            turbine,
+            "getEnergy",
+            0
+        )
     )
 
 end
@@ -158,10 +202,12 @@ end
 
 function functions.getEnergyCapacity(turbine)
 
-    return functions.safeCall(
-        turbine,
-        "getEnergyCapacity",
-        0
+    return functions.toNumber(
+        functions.safeCall(
+            turbine,
+            "getEnergyCapacity",
+            0
+        )
     )
 
 end
@@ -187,10 +233,12 @@ end
 
 function functions.getProduction(turbine)
 
-    return functions.safeCall(
-        turbine,
-        "getProductionRate",
-        0
+    return functions.toNumber(
+        functions.safeCall(
+            turbine,
+            "getProductionRate",
+            0
+        )
     )
 
 end
@@ -198,10 +246,12 @@ end
 
 function functions.getMaxProduction(turbine)
 
-    return functions.safeCall(
-        turbine,
-        "getMaxProduction",
-        0
+    return functions.toNumber(
+        functions.safeCall(
+            turbine,
+            "getMaxProduction",
+            0
+        )
     )
 
 end
@@ -213,10 +263,12 @@ end
 
 function functions.getMaxWaterOutput(turbine)
 
-    return functions.safeCall(
-        turbine,
-        "getMaxWaterOutput",
-        0
+    return functions.toNumber(
+        functions.safeCall(
+            turbine,
+            "getMaxWaterOutput",
+            0
+        )
     )
 
 end
@@ -228,10 +280,8 @@ end
 
 function functions.getBlades(turbine)
 
-    return functions.safeCall(
-        turbine,
-        "getBlades",
-        0
+    return functions.toNumber(
+        functions.safeCall(turbine, "getBlades", 0)
     )
 
 end
@@ -239,10 +289,8 @@ end
 
 function functions.getVents(turbine)
 
-    return functions.safeCall(
-        turbine,
-        "getVents",
-        0
+    return functions.toNumber(
+        functions.safeCall(turbine, "getVents", 0)
     )
 
 end
@@ -250,10 +298,8 @@ end
 
 function functions.getCoils(turbine)
 
-    return functions.safeCall(
-        turbine,
-        "getCoils",
-        0
+    return functions.toNumber(
+        functions.safeCall(turbine, "getCoils", 0)
     )
 
 end
@@ -261,10 +307,8 @@ end
 
 function functions.getCondensers(turbine)
 
-    return functions.safeCall(
-        turbine,
-        "getCondensers",
-        0
+    return functions.toNumber(
+        functions.safeCall(turbine, "getCondensers", 0)
     )
 
 end
@@ -272,17 +316,15 @@ end
 
 function functions.getDispersers(turbine)
 
-    return functions.safeCall(
-        turbine,
-        "getDispersers",
-        0
+    return functions.toNumber(
+        functions.safeCall(turbine, "getDispersers", 0)
     )
 
 end
 
 
 --------------------------------------------------
--- DUMPING MODE
+-- DUMPING
 --------------------------------------------------
 
 function functions.getDumpingMode(turbine)
