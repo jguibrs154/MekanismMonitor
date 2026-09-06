@@ -63,44 +63,62 @@ term.setCursorPos(1, 1)
 -- FORMATAR NÚMEROS
 --------------------------------------------------
 
-local function formatNumber(number)
+local function formatNumber(value)
 
-    if not number then
-        return "0"
+    -- Se vier uma tabela do Mekanism
+    if type(value) == "table" then
+
+        if type(value.amount) == "number" then
+            value = value.amount
+
+        elseif type(value.value) == "number" then
+            value = value.value
+
+        elseif type(value[1]) == "number" then
+            value = value[1]
+
+        else
+            value = 0
+        end
+
     end
 
-    if number >= 1000000000 then
+    -- Garantir que seja número
+    if type(value) ~= "number" then
+        value = 0
+    end
+
+    if value >= 1000000000 then
 
         return string.format(
             "%.2f B",
-            number / 1000000000
+            value / 1000000000
         )
 
-    elseif number >= 1000000 then
+    elseif value >= 1000000 then
 
         return string.format(
             "%.2f M",
-            number / 1000000
+            value / 1000000
         )
 
-    elseif number >= 1000 then
+    elseif value >= 1000 then
 
         return string.format(
             "%.2f K",
-            number / 1000
+            value / 1000
         )
 
     else
 
         return string.format(
             "%.0f",
-            number
+            value
         )
 
     end
 
 end
-
 
 --------------------------------------------------
 -- PORCENTAGEM
