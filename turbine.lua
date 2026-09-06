@@ -1,13 +1,9 @@
 -- ==========================================
 -- MEKANISM INDUSTRIAL TURBINE
--- CONTROL PANEL
+-- DOUBLE BUFFER CONTROL PANEL
 -- ==========================================
 
 local functions = require("functions")
-
---------------------------------------------------
--- CONFIGURAÇÃO
---------------------------------------------------
 
 local REFRESH_TIME = 1
 
@@ -25,7 +21,7 @@ for _, name in ipairs(peripheral.getNames()) do
 end
 
 if not monitor then
-    print("ERRO: Nenhum monitor encontrado.")
+    print("ERRO: Monitor nao encontrado.")
     return
 end
 
@@ -35,15 +31,26 @@ end
 
 monitor.setTextScale(0.5)
 
-term.redirect(monitor)
-
-local width, height = term.getSize()
+local width, height = monitor.getSize()
 
 --------------------------------------------------
--- FUNÇÕES AUXILIARES
+-- BUFFER
 --------------------------------------------------
 
-local function number(value)
+local buffer = window.create(
+    monitor,
+    1,
+    1,
+    width,
+    height,
+    false
+)
+
+--------------------------------------------------
+-- FUNCOES
+--------------------------------------------------
+
+local function safeNumber(value)
 
     if type(value) == "number" then
         return value
@@ -62,7 +69,6 @@ local function number(value)
         if type(value[1]) == "number" then
             return value[1]
         end
-
     end
 
     return 0
@@ -70,12 +76,12 @@ end
 
 
 --------------------------------------------------
--- FORMATAR NÚMERO
+-- FORMATAR NUMEROS
 --------------------------------------------------
 
 local function formatNumber(value)
 
-    value = number(value)
+    value = safeNumber(value)
 
     if value >= 1000000000 then
         return string.format("%.2f B", value / 1000000000)
@@ -97,9 +103,9 @@ end
 -- PORCENTAGEM
 --------------------------------------------------
 
-local function percent(value)
+local function getPercent(value)
 
-    value = number(value)
+    value = safeNumber(value)
 
     if value < 0 then
         value = 0
@@ -114,51 +120,62 @@ end
 
 
 --------------------------------------------------
--- TEXTO CENTRALIZADO
+-- LIMPAR LINHA DO BUFFER
+--------------------------------------------------
+
+local function clearLine(y)
+
+    buffer.setCursorPos(1, y)
+
+    buffer.write(
+        string.rep(" ", width)
+    )
+
+end
+
+
+--------------------------------------------------
+-- ESCREVER TEXTO
+--------------------------------------------------
+
+local function writeAt(x, y, text)
+
+    buffer.setCursorPos(x, y)
+    buffer.write(tostring(text))
+
+end
+
+
+--------------------------------------------------
+-- CENTRALIZAR
 --------------------------------------------------
 
 local function center(y, text)
 
-    local x = math.floor((width - #text) / 2) + 1
+    local x =
+        math.floor(
+            (width - #text) / 2
+        ) + 1
 
     if x < 1 then
         x = 1
     end
 
-    term.setCursorPos(x, y)
-    term.write(text)
+    writeAt(x, y, text)
 
 end
 
 
 --------------------------------------------------
--- LINHA HORIZONTAL
+-- LINHA
 --------------------------------------------------
 
-local function horizontalLine(y)
+local function line(y)
 
-    term.setCursorPos(1, y)
-    term.write(string.rep("-", width))
-
-end
-
-
---------------------------------------------------
--- ESCREVER CAMPO
---------------------------------------------------
-
-local function writeField(x, y, text, fieldWidth)
-
-    term.setCursorPos(x, y)
-
-    term.write(
-        string.rep(" ", fieldWidth)
-    )
-
-    term.setCursorPos(x, y)
-
-    term.write(
-        tostring(text)
+    writeAt(
+        1,
+        y,
+        string.rep("-", width)
     )
 
 end
@@ -168,9 +185,9 @@ end
 -- BARRA
 --------------------------------------------------
 
-local function drawBar(x, y, barWidth, value)
+local function bar(x, y, barWidth, value)
 
-    value = number(value)
+    value = safeNumber(value)
 
     if value < 0 then
         value = 0
@@ -183,37 +200,43 @@ local function drawBar(x, y, barWidth, value)
     local filled =
         math.floor(barWidth * value)
 
-    term.setCursorPos(x, y)
+    local empty =
+        barWidth - filled
 
-    term.write("[")
-
-    for i = 1, barWidth do
-
-        if i <= filled then
-            term.write("=")
-        else
-            term.write(" ")
-        end
-
-    end
-
-    term.write("]")
+    writeAt(
+        x,
+        y,
+        "["
+        .. string.rep("=", filled)
+        .. string.rep(" ", empty)
+        .. "]"
+    )
 
 end
 
 
 --------------------------------------------------
--- DESENHAR INTERFACE
--- ISSO ACONTECE SOMENTE UMA VEZ
+-- CONSTRUIR INTERFACE
 --------------------------------------------------
 
-local function drawInterface()
-
-    term.clear()
-    term.setCursorPos(1, 1)
+local function draw(turbine)
 
     --------------------------------------------------
-    -- TÍTULO
+    -- LIMPAR SOMENTE O BUFFER
+    --------------------------------------------------
+
+    buffer.setBackgroundColor(
+        colors.black
+    )
+
+    buffer.setTextColor(
+        colors.white
+    )
+
+    buffer.clear()
+
+    --------------------------------------------------
+    -- TITULO
     --------------------------------------------------
 
     center(
@@ -221,111 +244,337 @@ local function drawInterface()
         "INDUSTRIAL TURBINE CONTROL"
     )
 
-    horizontalLine(2)
+    line(2)
 
     --------------------------------------------------
     -- STATUS
     --------------------------------------------------
 
-    term.setCursorPos(2, 4)
-    term.write("STATUS:")
+    writeAt(
+        2,
+        4,
+        "STATUS:"
+    )
+
+    local status =
+        functions.getStatus(turbine)
+
+    writeAt(
+        10,
+        4,
+        status
+    )
 
     --------------------------------------------------
     -- STEAM
     --------------------------------------------------
 
-    term.setCursorPos(2, 6)
-    term.write("STEAM")
+    writeAt(
+        2,
+        6,
+        "STEAM"
+    )
 
-    term.setCursorPos(2, 7)
-    term.write("[")
+    local steam =
+        functions.getSteam(turbine)
 
-    term.write(
-        string.rep(
-            " ",
-            math.min(width - 5, 30)
+    local steamCapacity =
+        functions.getSteamCapacity(turbine)
+
+    local steamPercent =
+        safeNumber(
+            functions.getSteamPercentage(turbine)
+        )
+
+    writeAt(
+        10,
+        6,
+        string.format(
+            "%.1f%%",
+            getPercent(steamPercent)
         )
     )
 
-    term.write("]")
+    bar(
+        2,
+        7,
+        math.min(30, width - 5),
+        steamPercent
+    )
 
-    term.setCursorPos(2, 8)
-    term.write("")
+    writeAt(
+        2,
+        8,
+        formatNumber(steam)
+        .. " / "
+        .. formatNumber(steamCapacity)
+        .. " mB"
+    )
 
     --------------------------------------------------
     -- ENERGY
     --------------------------------------------------
 
-    term.setCursorPos(2, 10)
-    term.write("ENERGY")
+    writeAt(
+        2,
+        10,
+        "ENERGY"
+    )
+
+    local energy =
+        functions.getEnergy(turbine)
+
+    local energyCapacity =
+        functions.getEnergyCapacity(turbine)
+
+    local energyPercent =
+        functions.getEnergyPercentage(turbine)
+
+    energyPercent =
+        safeNumber(energyPercent)
+
+    writeAt(
+        10,
+        10,
+        string.format(
+            "%.1f%%",
+            getPercent(energyPercent)
+        )
+    )
+
+    bar(
+        2,
+        11,
+        math.min(30, width - 5),
+        energyPercent
+    )
+
+    if energyCapacity > 0 then
+
+        writeAt(
+            2,
+            12,
+            formatNumber(energy)
+            .. " / "
+            .. formatNumber(energyCapacity)
+            .. " FE"
+        )
+
+    else
+
+        writeAt(
+            2,
+            12,
+            "ENERGY DATA UNAVAILABLE"
+        )
+
+    end
 
     --------------------------------------------------
-    -- PRODUCTION
+    -- PRODUCAO
     --------------------------------------------------
 
-    term.setCursorPos(2, 14)
-    term.write("PRODUCTION")
+    writeAt(
+        2,
+        14,
+        "PRODUCTION"
+    )
+
+    local production =
+        functions.getProduction(turbine)
+
+    local maxProduction =
+        functions.getMaxProduction(turbine)
+
+    local productionPercent = 0
+
+    if maxProduction > 0 then
+        productionPercent =
+            production / maxProduction
+    end
+
+    writeAt(
+        14,
+        14,
+        string.format(
+            "%.1f%%",
+            getPercent(productionPercent)
+        )
+    )
+
+    bar(
+        2,
+        15,
+        math.min(30, width - 5),
+        productionPercent
+    )
+
+    writeAt(
+        2,
+        16,
+        formatNumber(production)
+        .. " / "
+        .. formatNumber(maxProduction)
+        .. " FE/t"
+    )
 
     --------------------------------------------------
     -- STEAM INPUT
     --------------------------------------------------
 
-    term.setCursorPos(2, 18)
-    term.write("STEAM INPUT:")
+    writeAt(
+        2,
+        18,
+        "STEAM INPUT:"
+    )
+
+    writeAt(
+        15,
+        18,
+        formatNumber(
+            functions.getSteamInput(turbine)
+        )
+        .. " mB/t"
+    )
 
     --------------------------------------------------
     -- FLOW
     --------------------------------------------------
 
-    term.setCursorPos(2, 19)
-    term.write("FLOW RATE:")
+    writeAt(
+        2,
+        19,
+        "FLOW RATE:"
+    )
+
+    writeAt(
+        15,
+        19,
+        formatNumber(
+            functions.getFlow(turbine)
+        )
+        .. " / "
+        .. formatNumber(
+            functions.getMaxFlow(turbine)
+        )
+        .. " mB/t"
+    )
 
     --------------------------------------------------
     -- ESTRUTURA
     --------------------------------------------------
 
-    horizontalLine(21)
+    line(21)
 
     center(
         22,
         "TURBINE STRUCTURE"
     )
 
-    term.setCursorPos(2, 24)
-    term.write("BLADES:")
+    writeAt(
+        2,
+        24,
+        "BLADES:"
+    )
 
-    term.setCursorPos(20, 24)
-    term.write("VENTS:")
+    writeAt(
+        10,
+        24,
+        functions.getBlades(turbine)
+    )
 
-    term.setCursorPos(2, 25)
-    term.write("COILS:")
+    writeAt(
+        20,
+        24,
+        "VENTS:"
+    )
 
-    term.setCursorPos(20, 25)
-    term.write("CONDENSERS:")
+    writeAt(
+        28,
+        24,
+        functions.getVents(turbine)
+    )
 
-    term.setCursorPos(2, 26)
-    term.write("DISPERSERS:")
+    writeAt(
+        2,
+        25,
+        "COILS:"
+    )
+
+    writeAt(
+        10,
+        25,
+        functions.getCoils(turbine)
+    )
+
+    writeAt(
+        20,
+        25,
+        "CONDENSERS:"
+    )
+
+    writeAt(
+        33,
+        25,
+        functions.getCondensers(turbine)
+    )
+
+    writeAt(
+        2,
+        26,
+        "DISPERSERS:"
+    )
+
+    writeAt(
+        13,
+        26,
+        functions.getDispersers(turbine)
+    )
 
     --------------------------------------------------
     -- DUMPING
     --------------------------------------------------
 
-    horizontalLine(28)
+    line(28)
 
-    term.setCursorPos(2, 29)
-    term.write("DUMPING MODE:")
+    writeAt(
+        2,
+        29,
+        "DUMPING MODE:"
+    )
+
+    local dumping =
+        functions.getDumpingMode(turbine)
+
+    if dumping then
+
+        writeAt(
+            16,
+            29,
+            "ACTIVE"
+        )
+
+    else
+
+        writeAt(
+            16,
+            29,
+            "IDLE"
+        )
+
+    end
 
     --------------------------------------------------
-    -- RODAPÉ
+    -- RODAPE
     --------------------------------------------------
 
     if height >= 31 then
 
-        horizontalLine(height - 1)
+        line(height - 1)
 
-        term.setCursorPos(2, height)
-
-        term.write(
+        writeAt(
+            2,
+            height,
             "AUTO REFRESH: "
             .. REFRESH_TIME
             .. "s"
@@ -337,129 +586,28 @@ end
 
 
 --------------------------------------------------
--- ATUALIZAR STEAM
+-- COPIAR BUFFER PARA O MONITOR
 --------------------------------------------------
 
-local function updateSteam(turbine)
+local function updateMonitor()
 
-    local steam =
-        functions.getSteam(turbine)
+    monitor.setCursorPos(1, 1)
 
-    local capacity =
-        functions.getSteamCapacity(turbine)
+    for y = 1, height do
 
-    local percentage =
-        functions.getSteamPercentage(turbine)
+        buffer.setCursorPos(1, y)
 
-    percentage = number(percentage)
+        local text,
+              textColor,
+              backgroundColor =
+            buffer.getLine(y)
 
-    --------------------------------------------------
-    -- PORCENTAGEM
-    --------------------------------------------------
+        monitor.setCursorPos(1, y)
 
-    writeField(
-        10,
-        6,
-        string.format(
-            "%.1f%%",
-            percent(percentage)
-        ),
-        10
-    )
-
-    --------------------------------------------------
-    -- BARRA
-    --------------------------------------------------
-
-    drawBar(
-        2,
-        7,
-        math.min(width - 5, 30),
-        percentage
-    )
-
-    --------------------------------------------------
-    -- QUANTIDADE
-    --------------------------------------------------
-
-    writeField(
-        2,
-        8,
-        formatNumber(steam)
-        .. " / "
-        .. formatNumber(capacity)
-        .. " mB",
-        math.min(width - 2, 35)
-    )
-
-end
-
-
---------------------------------------------------
--- ATUALIZAR ENERGY
---------------------------------------------------
-
-local function updateEnergy(turbine)
-
-    local energy =
-        functions.getEnergy(turbine)
-
-    local capacity =
-        functions.getEnergyCapacity(turbine)
-
-    local percentage =
-        functions.getEnergyPercentage(turbine)
-
-    percentage = number(percentage)
-
-    --------------------------------------------------
-    -- PORCENTAGEM
-    --------------------------------------------------
-
-    writeField(
-        10,
-        10,
-        string.format(
-            "%.1f%%",
-            percent(percentage)
-        ),
-        10
-    )
-
-    --------------------------------------------------
-    -- BARRA
-    --------------------------------------------------
-
-    drawBar(
-        2,
-        11,
-        math.min(width - 5, 30),
-        percentage
-    )
-
-    --------------------------------------------------
-    -- QUANTIDADE
-    --------------------------------------------------
-
-    if capacity > 0 then
-
-        writeField(
-            2,
-            12,
-            formatNumber(energy)
-            .. " / "
-            .. formatNumber(capacity)
-            .. " FE",
-            math.min(width - 2, 35)
-        )
-
-    else
-
-        writeField(
-            2,
-            12,
-            "ENERGY DATA UNAVAILABLE",
-            math.min(width - 2, 35)
+        monitor.blit(
+            text,
+            textColor,
+            backgroundColor
         )
 
     end
@@ -468,217 +616,7 @@ end
 
 
 --------------------------------------------------
--- ATUALIZAR PRODUÇÃO
---------------------------------------------------
-
-local function updateProduction(turbine)
-
-    local production =
-        functions.getProduction(turbine)
-
-    local maxProduction =
-        functions.getMaxProduction(turbine)
-
-    local productionPercentage = 0
-
-    if maxProduction > 0 then
-
-        productionPercentage =
-            production / maxProduction
-
-    end
-
-    --------------------------------------------------
-    -- PORCENTAGEM
-    --------------------------------------------------
-
-    writeField(
-        14,
-        14,
-        string.format(
-            "%.1f%%",
-            percent(productionPercentage)
-        ),
-        10
-    )
-
-    --------------------------------------------------
-    -- BARRA
-    --------------------------------------------------
-
-    drawBar(
-        2,
-        15,
-        math.min(width - 5, 30),
-        productionPercentage
-    )
-
-    --------------------------------------------------
-    -- VALOR
-    --------------------------------------------------
-
-    writeField(
-        2,
-        16,
-        formatNumber(production)
-        .. " / "
-        .. formatNumber(maxProduction)
-        .. " FE/t",
-        math.min(width - 2, 35)
-    )
-
-end
-
-
---------------------------------------------------
--- ATUALIZAR STEAM INPUT
---------------------------------------------------
-
-local function updateSteamInput(turbine)
-
-    local input =
-        functions.getSteamInput(turbine)
-
-    writeField(
-        15,
-        18,
-        formatNumber(input)
-        .. " mB/t",
-        math.max(10, width - 15)
-    )
-
-end
-
-
---------------------------------------------------
--- ATUALIZAR FLOW
---------------------------------------------------
-
-local function updateFlow(turbine)
-
-    local flow =
-        functions.getFlow(turbine)
-
-    local maxFlow =
-        functions.getMaxFlow(turbine)
-
-    writeField(
-        15,
-        19,
-        formatNumber(flow)
-        .. " / "
-        .. formatNumber(maxFlow)
-        .. " mB/t",
-        math.max(10, width - 15)
-    )
-
-end
-
-
---------------------------------------------------
--- ATUALIZAR ESTRUTURA
---------------------------------------------------
-
-local function updateStructure(turbine)
-
-    writeField(
-        10,
-        24,
-        functions.getBlades(turbine),
-        8
-    )
-
-    writeField(
-        29,
-        24,
-        functions.getVents(turbine),
-        8
-    )
-
-    writeField(
-        10,
-        25,
-        functions.getCoils(turbine),
-        8
-    )
-
-    writeField(
-        34,
-        25,
-        functions.getCondensers(turbine),
-        8
-    )
-
-    writeField(
-        13,
-        26,
-        functions.getDispersers(turbine),
-        8
-    )
-
-end
-
-
---------------------------------------------------
--- ATUALIZAR DUMPING
---------------------------------------------------
-
-local function updateDumping(turbine)
-
-    local dumping =
-        functions.getDumpingMode(turbine)
-
-    if dumping then
-
-        writeField(
-            16,
-            29,
-            "ACTIVE",
-            math.max(10, width - 16)
-        )
-
-    else
-
-        writeField(
-            16,
-            29,
-            "IDLE",
-            math.max(10, width - 16)
-        )
-
-    end
-
-end
-
-
---------------------------------------------------
--- ATUALIZAR STATUS
---------------------------------------------------
-
-local function updateStatus(turbine)
-
-    local status =
-        functions.getStatus(turbine)
-
-    writeField(
-        10,
-        4,
-        status,
-        15
-    )
-
-end
-
-
---------------------------------------------------
--- DESENHAR A INTERFACE UMA VEZ
---------------------------------------------------
-
-drawInterface()
-
-
---------------------------------------------------
--- LOOP PRINCIPAL
+-- LOOP
 --------------------------------------------------
 
 while true do
@@ -688,30 +626,33 @@ while true do
 
     if turbine then
 
-        updateStatus(turbine)
+        --------------------------------------------------
+        -- MONTA A TELA COMPLETA NA MEMORIA
+        --------------------------------------------------
 
-        updateSteam(turbine)
+        draw(turbine)
 
-        updateEnergy(turbine)
+        --------------------------------------------------
+        -- JOGA A TELA PRONTA NO MONITOR
+        --------------------------------------------------
 
-        updateProduction(turbine)
-
-        updateSteamInput(turbine)
-
-        updateFlow(turbine)
-
-        updateStructure(turbine)
-
-        updateDumping(turbine)
+        updateMonitor()
 
     else
 
-        writeField(
-            10,
-            4,
-            "TURBINE NOT FOUND",
-            math.max(15, width - 10)
+        buffer.clear()
+
+        center(
+            5,
+            "TURBINE NOT FOUND"
         )
+
+        center(
+            7,
+            "Waiting for Mekanism turbine..."
+        )
+
+        updateMonitor()
 
     end
 
