@@ -2,7 +2,7 @@
 -- MEKANISM TURBINE CC - STARTUP
 -- ==========================================
 
-local BASE_URL = "https://raw.githubusercontent.com/SEU_USUARIO/Mekanism-Turbine-CC/main/"
+local BASE_URL = "https://raw.githubusercontent.com/jguibrs154/MekanismMonitor/main/"
 
 print("================================")
 print("  MEKANISM TURBINE CONTROLLER")
